@@ -16,17 +16,20 @@ unsigned char RxMesaj(unsigned char i);				// primire mesaj de la nodul i
 unsigned char RxMesaj(unsigned char i){					// receptie mesaj															   
 	unsigned char j, ch, sc, adresa_hw_src, screc, src, dest, lng, tipmes;
 	
-																			// dezactivare Tx, validare RX UART1
-																			// dezactivare Tx, validare RX RS485
-																			// receptie doar octeti de adresa
+   UART1_TxRxEN(0, 1);												// dezactivare Tx, validare RX UART1
+	UART1_RS485_XCVR(0, 1);											// dezactivare Tx, validare RX RS485
+	UART1_MultiprocMode(MULTIPROC_ADRESA);						// receptie doar octeti de adresa
 
-																			// Daca nodul este master sau detine jetonul ...
-																				// M: asteapta cu timeout raspunsul de la slave
-																				// M: timeout, terminare receptie,  devine master sau regenerare jeton
-
-																				// M: raspunsul de la slave a venit, considera ca mesajul anterior a fost transmis cu succes	
-																				// M: adresa HW gresita, terminare receptie
-																		
+	if(TIP_NOD == MASTER){												// Daca nodul este master sau detine jetonul ...
+		ch = UART1_Getch_TMO(WAIT);									// M: asteapta cu timeout raspunsul de la slave
+		if(ch==TMO){														// M: timeout, terminare receptie,  devine master sau regenerare jeton
+         return TMO;
+		}else{
+		   retea[i].full=0;												// M: raspunsul de la slave a venit, considera ca mesajul anterior a fost transmis cu succes	
+			if(ch != ADR_NOD){											// M: adresa HW gresita, terminare receptie
+				return ERA;
+			}
+		}			
 																		
 																			
 																					// // S: asteapta inceput mesaj nou
@@ -35,7 +38,7 @@ unsigned char RxMesaj(unsigned char i){					// receptie mesaj
 																				
 																				// S: iese doar atunci cand mesajul ii este adresat acestui nod
  																			
-	
+	}	
 																			// receptie octeti de date (mod MULTIPROC_DATA)
 
 																			// M+S: initializeaza screc cu adresa HW dest (ADR_NOD)

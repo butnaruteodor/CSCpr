@@ -29,100 +29,106 @@ unsigned char RxMesaj(unsigned char i){					// receptie mesaj
 			if(ch != ADR_NOD){											// M: adresa HW gresita, terminare receptie
 				return ERA;
 			}
-		}			
-																		
-																			
-																					// // S: asteapta inceput mesaj nou
-																					
-																					// slave-ul nu raspunde
-																				
-																				// S: iese doar atunci cand mesajul ii este adresat acestui nod
- 																			
-	}	
-																			// receptie octeti de date (mod MULTIPROC_DATA)
+		}
+	}else{
+		do{
+			ch = UART1_Getch_TMO(2*WAIT+ADR_NOD*WAIT);					// S: asteapta inceput mesaj nou
+																						
+			if(ch == TMO){															// slave-ul nu raspunde
+				return TMO;
+			}			
+		}while(ch!=ADR_NOD);														// S: iese doar atunci cand mesajul ii este adresat acestui nod
+	}																																						
+ 																				
+	UART1_MultiprocMode(MULTIPROC_DATA);						// receptie octeti de date (mod MULTIPROC_DATA)
 
-																			// M+S: initializeaza screc cu adresa HW dest (ADR_NOD)
+	screc = ADR_NOD;													// M+S: initializeaza screc cu adresa HW dest (ADR_NOD)
+	adresa_hw_src = UART1_Getch_TMO(5);
+	if(adresa_hw_src==TMO) 							            // M+S: Asteapta cu timeout receptia adresei HW sursa
+		return CAN;														// mesaj incomplet
 	
-																			// M+S: Asteapta cu timeout receptia adresei HW sursa
-																			// mesaj incomplet
-	
-																			// M+S: ia in calcul in screc adresa hw src
-
-																			// actualizeaza adresa master
-	
-																			// M+S: Asteapta cu timeout receptie tip mesaj
-																			// M+S: mesaj incomplet
-
+	screc ^= adresa_hw_src;											// M+S: ia in calcul in screc adresa hw src
+	if(TIP_NOD==SLAVE){
+		ADR_MASTER = adresa_hw_src;								// actualizeaza adresa master
+	}
+	tipmes = UART1_Getch_TMO(5);									// M+S: Asteapta cu timeout receptie tip mesaj
+	if(tipmes==TMO) return CAN;										// M+S: mesaj incomplet
 																			
 																				// M+S: ignora restul mesajului
 																				
-																				// M+S: tip mesaj eronat, terminare receptie
+	if(tipmes>1) return TIP;											// M+S: tip mesaj eronat, terminare receptie
 																			
-																			// M+S: ia in calcul in screc tipul mesajului
+	screc ^= tipmes;														// M+S: ia in calcul in screc tipul mesajului
 	
-																			// M+S: Daca mesajul este unul de date (USER_MES)
-																				// M+S: asteapta cu timeout adresa nodului sursa
+	if(tipmes == USER_MES){											// M+S: Daca mesajul este unul de date (USER_MES)
+		src = UART1_Getch_TMO(5);										// M+S: asteapta cu timeout adresa nodului sursa
+		if(src==TMO) return CAN;																		
+		screc ^= src;														// M+S: ia in calcul in screc adresa src
+		dest = UART1_Getch_TMO(5);
+		if(dest==TMO) return CAN;										// M+S: asteapta cu timeout adresa nodului destinatie
 																				
-																				// M+S: ia in calcul in screc adresa src
+		screc ^= dest;														// M+S: ia in calcul in screc adresa dest
 		
-																				// M+S: asteapta cu timeout adresa nodului destinatie
-																				
-																				// M+S: ia in calcul in screc adresa dest
-		
-																				// Daca nodul este master...
-																					// M: bufferul destinatie este deja plin, terminare receptie
+	if(TIP_NOD==MASTER)													// Daca nodul este master...
+		if(retea[dest].full == 1)return OVR; 							// M: bufferul destinatie este deja plin, terminare receptie
 																				
 
-																				// M+S: asteapta cu timeout receptia lng
-																				
-																				// M+S: ia in calcul in screc lungimea datelor
+	lng = UART1_Getch_TMO(5);											// M+S: asteapta cu timeout receptia lng
+	if(lng==TMO) return CAN;																			
+	screc ^= lng;															// M+S: ia in calcul in screc lungimea datelor
 		
-																				// Daca nodul este master...
-																					// M: stocheaza adresa HW sursa	(ADR_NOD)
-																					// M: stocheaza tipul mesajului	
-																					// M: stocheaza la src codul nodului sursa al mesajului	
-																					// M: stocheaza la dest codul nodului destinatie a mesajului	
-																					// M: stocheaza lng
-																					
-																						// M: asteapta cu timeout un octet de date
-																						
-																						// M: ia in calcul in screc datele
+	if(TIP_NOD==MASTER){													// Daca nodul este master...
+		retea[dest].bufbin.adresa_hw_src = ADR_NOD;					// M: stocheaza adresa HW sursa	(ADR_NOD)
+		retea[dest].bufbin.tipmes = tipmes;								// M: stocheaza tipul mesajului
+		retea[dest].bufbin.src = src;										// M: stocheaza la src codul nodului sursa al mesajului	
+		retea[dest].bufbin.dest = dest;									// M: stocheaza la dest codul nodului destinatie a mesajului	
+		retea[dest].bufbin.lng = lng;										// M: stocheaza lng
+																			
 																						
 																					
-																					// M: Asteapta cu timeout receptia sumei de control
 																					
-
 																					
-																						// M: mesaj corect, marcare buffer plin
+																					
+		j = UART1_Getch_TMO(5);													// M: asteapta cu timeout un octet de date
+		if(j==TMO)return TMO;
+		retea[dest].bufbin.
+		screc ^= j;																	// M: ia in calcul in screc datele
 																						
 																					
-																					// M: eroare SC, terminare receptie
-																															
-																				// nodul este slave
-																					// S: stocheaza la destsrc codul nodului sursa al mesajului	
-																					// S: stocheaza lng
+		sc = UART1_Getch_TMO(5);											// M: Asteapta cu timeout receptia sumei de control
+		if(sc==TMO) return CAN;																																							
+		else if(sc==screc){													// M: mesaj corect, marcare buffer plin
+			retea[dest].full = 1;
+			return ROK;
+		}else{																			
+			return ESC;																// M: eroare SC, terminare receptie
+		}																																														
+	}else{																	// nodul este slave
+		retea[ADR_NOD].bufbin.src = src;									// S: stocheaza la destsrc codul nodului sursa al mesajului	
+		retea[ADR_NOD].bufbin.lng = lng;					 				// S: stocheaza lng
 																					
 																						// S: asteapta cu timeout un octet de date
 																						
 																													// S: ia in calcul in screc octetul de date
 																					
 																					
-																					// S: Asteapta cu timeout receptia sumei de control
-																					
-
-																					
-																						// S: mesaj corect, marcare buffer plin
-																						
-																		
-																					// S: eroare SC, terminare receptie
-																		
-																				// este un mesaj POLL_MES sau JET_MES
-																					// M+S:memoreaza de la cine a primit jetonul
-																					// M+S: Asteapta cu timeout receptia sumei de control
-																					
-																					
-																					// M+S: eroare SC, terminare receptie
-		return TMO; 		// simuleaza timeout receptie																
+		sc = UART1_Getch_TMO(5);												// S: Asteapta cu timeout receptia sumei de control
+		if(sc==TMO)return CAN;																			
+															
+		if(sc == screc){															// S: mesaj corect, marcare buffer plin
+			retea[ADR_NOD].full = 1;	
+			return ROK;
+		}else{																
+			return ESC;																// S: eroare SC, terminare receptie
+		}
+	}															
+	}else{																	// este un mesaj POLL_MES sau JET_MES
+		retea[ADR_NOD].bufbin.adresa_hw_src = adresa_hw_src;		// M+S:memoreaza de la cine a primit jetonul
+		sc = UART1_Getch_TMO(5);											// M+S: Asteapta cu timeout receptia sumei de control
+		if(sc==TMO) return CAN;																			
+		else if(sc==screc) return POK;																			
+		else return ESC;														// M+S: eroare SC, terminare receptie
+	}															
 }
 
 
